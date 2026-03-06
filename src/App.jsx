@@ -1,14 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-
-const defaultHead = `<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Preview Site</title>
-
-<!-- Paste your Cookie Banner script below -->
-<!-- Example:
-<script id="cookieyes" type="text/javascript" src="https://cdn-cookieyes.com/client_data/your-id/script.js"></script>
--->
-`;
+import { useMemo, useState } from "react";
 
 const defaultBody = `<header style="padding:20px; background:#0f172a; color:white;">
   <h1 style="margin:0;">Demo Website</h1>
@@ -21,129 +11,173 @@ const defaultBody = `<header style="padding:20px; background:#0f172a; color:whit
 
 <main style="padding:24px; font-family:Arial, sans-serif;">
   <h2>Cookie Banner Test Page</h2>
-  <p>
-    Use this page to test whether your banner script loads correctly in a live preview.
-  </p>
-  <button style="padding:10px 16px; border:none; background:#2563eb; color:white; border-radius:6px;">
+  <p>This is a public demo page for CookieYes verification and scanning.</p>
+  <button style="padding:10px 16px; border:none; border-radius:6px; background:#2563eb; color:#fff;">
     Sample Button
   </button>
 </main>`;
 
-const HEAD_KEY = "cookie_preview_head";
-const BODY_KEY = "cookie_preview_body";
+const defaultScript = `<!-- Start cookieyes banner -->
+<script id="cookieyes" type="text/javascript" src=""></script>
+<!-- End cookieyes banner -->`;
 
 export default function App() {
-  const [headCode, setHeadCode] = useState(defaultHead);
-  const [bodyCode, setBodyCode] = useState(defaultBody);
+  const [slug, setSlug] = useState("my-brand");
+  const [siteUrl, setSiteUrl] = useState("");
+  const [pageTitle, setPageTitle] = useState("Demo Website");
+  const [cookieScript, setCookieScript] = useState(defaultScript);
+  const [bodyHtml, setBodyHtml] = useState(defaultBody);
   const [message, setMessage] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const savedHead = localStorage.getItem(HEAD_KEY);
-    const savedBody = localStorage.getItem(BODY_KEY);
-
-    if (savedHead) setHeadCode(savedHead);
-    if (savedBody) setBodyCode(savedBody);
-  }, []);
-
-  const previewDocument = useMemo(() => {
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-${headCode}
-<style>
-  body {
-    margin: 0;
-    background: #ffffff;
-  }
-</style>
-</head>
-<body>
-${bodyCode}
-</body>
-</html>`;
-  }, [headCode, bodyCode, refreshKey]);
+  const demoUrl = useMemo(() => {
+    const base = window.location.origin;
+    const cleanSlug = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    return `${base}/demo/${cleanSlug || "my-brand"}`;
+  }, [slug]);
 
   const showMessage = (text) => {
     setMessage(text);
-    window.clearTimeout(window.__previewMessageTimer);
-    window.__previewMessageTimer = window.setTimeout(() => {
-      setMessage("");
-    }, 2000);
+    setTimeout(() => setMessage(""), 2500);
   };
 
-  const handleSave = () => {
-    localStorage.setItem(HEAD_KEY, headCode);
-    localStorage.setItem(BODY_KEY, bodyCode);
-    showMessage("Saved successfully");
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+
+      const response = await fetch("/api/save-demo", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          slug,
+          siteUrl,
+          pageTitle,
+          cookieScript,
+          bodyHtml
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save demo");
+      }
+
+      showMessage("Saved successfully");
+    } catch (error) {
+      showMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReset = () => {
-    localStorage.removeItem(HEAD_KEY);
-    localStorage.removeItem(BODY_KEY);
-    setHeadCode(defaultHead);
-    setBodyCode(defaultBody);
-    setRefreshKey((v) => v + 1);
-    showMessage("Reset to default");
-  };
+  const handleLoad = async () => {
+    try {
+      setLoading(true);
 
-  const handleReloadPreview = () => {
-    setRefreshKey((v) => v + 1);
-    showMessage("Preview reloaded");
+      const response = await fetch(`/api/get-demo?slug=${encodeURIComponent(slug)}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to load demo");
+      }
+
+      if (!data.demo) {
+        showMessage("No saved demo found for this slug");
+        return;
+      }
+
+      setSiteUrl(data.demo.site_url || "");
+      setPageTitle(data.demo.page_title || "Demo Website");
+      setCookieScript(data.demo.cookie_script || defaultScript);
+      setBodyHtml(data.demo.body_html || defaultBody);
+      showMessage("Loaded successfully");
+    } catch (error) {
+      showMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="app-shell">
-      <aside className="editor-panel">
-        <h1>Cookie Banner Preview Tool</h1>
+      <div className="editor-panel">
+        <h1>CookieYes Demo Builder</h1>
         <p className="subtitle">
-          Edit head and body code, then preview the banner in the iframe.
+          Use the demo URL below during CookieYes onboarding. After CookieYes gives
+          you the script, paste it here and save. Verification should use the same demo URL.
         </p>
 
+        <div className="field">
+          <label>Demo Slug</label>
+          <input
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            placeholder="my-brand"
+          />
+        </div>
+
+        <div className="field">
+          <label>Website URL used in CookieYes</label>
+          <input
+            value={siteUrl}
+            onChange={(e) => setSiteUrl(e.target.value)}
+            placeholder="https://example.com or the demo URL"
+          />
+        </div>
+
+        <div className="field">
+          <label>Page Title</label>
+          <input
+            value={pageTitle}
+            onChange={(e) => setPageTitle(e.target.value)}
+            placeholder="Demo Website"
+          />
+        </div>
+
+        <div className="demo-url-box">
+          <div className="demo-label">Public Demo URL</div>
+          <a href={demoUrl} target="_blank" rel="noreferrer">
+            {demoUrl}
+          </a>
+        </div>
+
         <div className="button-row">
-          <button onClick={handleSave}>Save</button>
-          <button onClick={handleReloadPreview} className="secondary">
-            Reload Preview
+          <button onClick={handleSave} disabled={loading}>
+            {loading ? "Saving..." : "Save"}
           </button>
-          <button onClick={handleReset} className="danger">
-            Reset
+          <button onClick={handleLoad} className="secondary" disabled={loading}>
+            Load
           </button>
+          <a className="link-button" href={demoUrl} target="_blank" rel="noreferrer">
+            Open Demo URL
+          </a>
         </div>
 
         {message && <div className="message">{message}</div>}
 
-        <label className="editor-label">Head Editor</label>
-        <textarea
-          value={headCode}
-          onChange={(e) => setHeadCode(e.target.value)}
-          className="code-editor"
-          spellCheck="false"
-        />
-
-        <label className="editor-label">Body Editor</label>
-        <textarea
-          value={bodyCode}
-          onChange={(e) => setBodyCode(e.target.value)}
-          className="code-editor"
-          spellCheck="false"
-        />
-      </aside>
-
-      <main className="preview-panel">
-        <div className="preview-header">
-          <h2>Live Preview</h2>
-          <p>
-            Paste your Cookie Banner script in the head editor and reload preview if needed.
-          </p>
+        <div className="field">
+          <label>CookieYes Script</label>
+          <textarea
+            value={cookieScript}
+            onChange={(e) => setCookieScript(e.target.value)}
+            rows={8}
+            spellCheck="false"
+          />
         </div>
 
-        <iframe
-          key={refreshKey}
-          title="Cookie Banner Preview"
-          srcDoc={previewDocument}
-          className="preview-frame"
-        />
-      </main>
+        <div className="field">
+          <label>Body HTML</label>
+          <textarea
+            value={bodyHtml}
+            onChange={(e) => setBodyHtml(e.target.value)}
+            rows={16}
+            spellCheck="false"
+          />
+        </div>
+      </div>
     </div>
   );
 }
