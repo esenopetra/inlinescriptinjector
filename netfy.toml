@@ -1,6 +1,23 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/save-demo"
+  to = "/.netlify/functions/save-demo"
+  status = 200
+
+[[redirects]]
+  from = "/api/get-demo"
+  to = "/.netlify/functions/get-demo"
+  status = 200
+
+[[redirects]]
+  from = "/demo/*"
+  to = "/.netlify/functions/render-demo?slug=:splat"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/*"
